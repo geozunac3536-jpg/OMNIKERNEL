@@ -38,7 +38,38 @@ except ImportError as e:
 # ==============================================================================
 # 🧠 CORE ENGINES
 # ==============================================================================
+class TCDS_ThermoEngine:
+    def __init__(self, structure):
+        self.structure = structure
+        self.coords = self._extract_coords()
+    
+    def apply_pressure(self, sigma, q_ext, mode="isotropic"):
+        """
+        Aplica presión externa y recalcula posiciones atómicas.
+        """
+        center = np.mean(self.coords, axis=0)
+        new_coords = []
 
+        for r in self.coords:
+            vec = r - center
+            dist = np.linalg.norm(vec) + 1e-6
+
+            # Ley TCDS de deformación
+            delta = (q_ext * sigma) / dist
+            r_new = r + vec / dist * delta
+
+            new_coords.append(r_new)
+
+        return np.array(new_coords)
+
+    def compute_stress_field(self, new_coords):
+        """
+        Calcula tensión local por átomo.
+        """
+        stress = np.linalg.norm(new_coords - self.coords, axis=1)
+        return stress
+        for atom, stress in zip(structure.get_atoms(), stress_field):
+    atom.set_bfactor(stress)
 class CausalMemory:
     """Persistencia mínima de estados causales"""
     def __init__(self):
@@ -112,6 +143,16 @@ class OntologicalEngine:
         <div id="v" style="width:100vw;height:100vh;"></div>
         <script>
         let pdb=`{pdb_clean}`;
+       viewer.setStyle({}, {
+  cartoon: {
+    colorscheme: {
+      prop: 'b',
+      gradient: 'roygb',
+      min: 0,
+      max: maxStress
+    }
+  }
+});
         let v=$3Dmol.createViewer("v");
         v.addModel(pdb,"pdb");
         v.setStyle({{}},{{{style}:{{color:"spectrum"}}}});
