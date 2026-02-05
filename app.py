@@ -195,7 +195,7 @@ for atom, (x, y, zv) in zip(structure.get_atoms(), coords):
     atom_serial += 1
 
 out += "END\n"
-                z.writestr(f"{name}.pdb", out)
+             z.writestr(f"{name}.pdb", out)
         with open(zip_name,"rb") as f:
             st.download_button("⬇️ Descargar ZIP", f, file_name=zip_name)
 
