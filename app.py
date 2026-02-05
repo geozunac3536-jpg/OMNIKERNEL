@@ -170,11 +170,31 @@ if pdb_text:
             for name, s in engine.SUBSTRATES.items():
                 coords = thermo.apply_pressure(s["sigma"], q_ext)
                 out = ""
-                i=0
-                for atom in structure.get_atoms():
-                    x,y,zv = coords[i]
-                    out += f"{atom.get_parent().get_id():<6}{x:8.3f}{y:8.3f}{zv:8.3f}\n"
-                    i+=1
+atom_serial = 1
+
+for atom, (x, y, zv) in zip(structure.get_atoms(), coords):
+    res = atom.get_parent()
+    chain = res.get_parent()
+    
+    resname = res.get_resname()
+    chain_id = chain.id
+    resseq = res.id[1]
+    atom_name = atom.get_name()
+    element = atom.element.strip() if atom.element else atom_name[0]
+
+    out += (
+        f"ATOM  {atom_serial:5d} "
+        f"{atom_name:<4}"
+        f"{resname:>3} "
+        f"{chain_id}"
+        f"{resseq:4d}    "
+        f"{x:8.3f}{y:8.3f}{zv:8.3f}"
+        f"  1.00 20.00           {element:>2}\n"
+    )
+
+    atom_serial += 1
+
+out += "END\n"
                 z.writestr(f"{name}.pdb", out)
         with open(zip_name,"rb") as f:
             st.download_button("⬇️ Descargar ZIP", f, file_name=zip_name)
