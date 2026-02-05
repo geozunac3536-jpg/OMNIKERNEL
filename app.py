@@ -163,43 +163,53 @@ if pdb_text:
     # ---- VISUALIZACIÓN ----
     render_view(pdb_text, stress=stress)
 
-    # ---- EXPORTACIÓN MULTISUSTRATO ----
-    if st.button("📦 Exportar PDB Multisustrato"):
-        zip_name = "TCDS_Multisubstrate.zip"
-        with zipfile.ZipFile(zip_name, "w") as z:
-            for name, s in engine.SUBSTRATES.items():
-                coords = thermo.apply_pressure(s["sigma"], q_ext)
-                out = ""
-atom_serial = 1
+# =========================
+# EXPORTACIÓN PDB CANÓNICA
+# =========================
 
-for atom, (x, y, zv) in zip(structure.get_atoms(), coords):
-    res = atom.get_parent()
-    chain = res.get_parent()
+def export_pdb(structure, coords, filepath):
+    """
+    Exporta una estructura BioPython + coordenadas modificadas a un PDB válido.
     
-    resname = res.get_resname()
-    chain_id = chain.id
-    resseq = res.id[1]
-    atom_name = atom.get_name()
-    element = atom.element.strip() if atom.element else atom_name[0]
+    Parameters
+    ----------
+    structure : Bio.PDB.Structure.Structure
+        Estructura base cargada (BioPython)
+    coords : iterable of (x, y, z)
+        Coordenadas finales (mismo orden que structure.get_atoms())
+    filepath : str
+        Ruta de salida .pdb
+    """
 
-    out += (
-        f"ATOM  {atom_serial:5d} "
-        f"{atom_name:<4}"
-        f"{resname:>3} "
-        f"{chain_id}"
-        f"{resseq:4d}    "
-        f"{x:8.3f}{y:8.3f}{zv:8.3f}"
-        f"  1.00 20.00           {element:>2}\n"
-    )
+    out = ""
+    atom_serial = 1
 
-    atom_serial += 1
+    for atom, (x, y, z) in zip(structure.get_atoms(), coords):
+        res = atom.get_parent()          # Residue
+        chain = res.get_parent()         # Chain
 
-out += "END\n"
-             z.writestr(f"{name}.pdb", out)
-        with open(zip_name,"rb") as f:
-            st.download_button("⬇️ Descargar ZIP", f, file_name=zip_name)
+        atom_name = atom.get_name()
+        resname = res.get_resname()
+        chain_id = chain.id if chain.id.strip() else "A"
+        resseq = res.id[1]
 
-else:
-    st.info("Esperando estructura PDB…")
+        # Elemento químico (fallback seguro)
+        element = atom.element.strip() if atom.element else atom_name[0]
 
-st.caption("© 2026 · TCDS · OmniKernel Centurion")
+        # Línea ATOM PDB estándar (80 columnas)
+        out += (
+            f"ATOM  {atom_serial:5d} "
+            f"{atom_name:<4}"
+            f"{resname:>3} "
+            f"{chain_id}"
+            f"{resseq:4d}    "
+            f"{x:8.3f}{y:8.3f}{z:8.3f}"
+            f"  1.00 20.00           {element:>2}\n"
+        )
+
+        atom_serial += 1
+
+    out += "END\n"
+
+    with open(filepath, "w") as f:
+        f.write(out)
