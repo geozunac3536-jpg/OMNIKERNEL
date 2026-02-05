@@ -1,223 +1,185 @@
 # ==============================================================================
-# ⚛️ OMNIKERNEL CENTURION v101.0 | FULL CANONICAL SINGLE-SCRIPT
+# ⚛️ OMNIKERNEL CENTURION v101.5 | UNIFIED THERMODYNAMIC EDITION
 # ==============================================================================
-# ARQUITECTURA: SERVER-SIDE (IP SAFE)
-# DESPLIEGUE: ANDROID WEBVIEW / BROWSER
-# AUTOR: Genaro Carrasco Ozuna (TCDS Architect)
+# ARQUITECTURA : STREAMLIT SERVER-SIDE (IP SAFE)
+# DESPLIEGUE   : ANDROID / WEB / DESKTOP
+# PARADIGMA    : TCDS (Q · Σ = φ)
+# AUTOR        : Genaro Carrasco Ozuna
 # ==============================================================================
-import streamlit as st
-import streamlit.components.v1 as components
-import numpy as np
-import io, time, hashlib, json
-from datetime import datetime
 
-# -------------------- PAGE CONFIG --------------------
+# ------------------------------------------------------------------------------
+# 1. CONFIGURACIÓN DE PÁGINA (OBLIGATORIO PRIMERO)
+# ------------------------------------------------------------------------------
+import streamlit as st
 st.set_page_config(
-    page_title="OmniKernel Centurion v101",
+    page_title="OmniKernel Centurion v101.5",
     page_icon="⚛️",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# -------------------- STYLE --------------------
-st.markdown("""
-<style>
-.stApp { background-color: #050505; color: #00ffcc; font-family: 'Courier New', monospace; }
-h1,h2,h3 { color:#00ffcc; border-bottom:1px solid #004444; }
-</style>
-""", unsafe_allow_html=True)
+# ------------------------------------------------------------------------------
+# 2. IMPORTACIONES
+# ------------------------------------------------------------------------------
+import numpy as np
+import io, os, time, json, zipfile
+import streamlit.components.v1 as components
 
-# -------------------- DEPENDENCIES --------------------
 try:
     import py3Dmol
     from Bio.PDB import PDBParser
 except ImportError as e:
-    st.error(f"Dependencia crítica faltante: {e}")
+    st.error(f"Dependencia faltante: {e}")
     st.stop()
 
+# ------------------------------------------------------------------------------
+# 3. ESTILOS DEEPTECH
+# ------------------------------------------------------------------------------
+st.markdown("""
+<style>
+.stApp { background:#050505; color:#00ffcc; font-family:Courier New; }
+h1,h2,h3 { border-bottom:1px solid #004444; }
+button { background:#002222 !important; color:#00ffcc !important; }
+</style>
+""", unsafe_allow_html=True)
+
 # ==============================================================================
-# 🧠 CORE ENGINES
+# 4. NÚCLEO FÍSICO TCDS
 # ==============================================================================
+
 class TCDS_ThermoEngine:
+    """
+    Motor termodinámico ontológico TCDS.
+    No estocástico. Paramétrico.
+    """
+
     def __init__(self, structure):
         self.structure = structure
         self.coords = self._extract_coords()
-    
-    def apply_pressure(self, sigma, q_ext, mode="isotropic"):
-        """
-        Aplica presión externa y recalcula posiciones atómicas.
-        """
+
+    def _extract_coords(self):
+        atoms = [a for a in self.structure.get_atoms()]
+        return np.array([a.get_coord() for a in atoms])
+
+    def apply_pressure(self, sigma, q_ext):
         center = np.mean(self.coords, axis=0)
         new_coords = []
 
         for r in self.coords:
             vec = r - center
             dist = np.linalg.norm(vec) + 1e-6
-
-            # Ley TCDS de deformación
-            delta = (q_ext * sigma) / dist
-            r_new = r + vec / dist * delta
-
-            new_coords.append(r_new)
+            delta = (sigma * q_ext) / dist
+            new_coords.append(r + vec/dist * delta)
 
         return np.array(new_coords)
 
-    def compute_stress_field(self, new_coords):
-        """
-        Calcula tensión local por átomo.
-        """
-        stress = np.linalg.norm(new_coords - self.coords, axis=1)
-        return stress
-        for atom, stress in zip(structure.get_atoms(), stress_field):
-    atom.set_bfactor(stress)
-class CausalMemory:
-    """Persistencia mínima de estados causales"""
-    def __init__(self):
-        self.history = []
+    def stress_field(self, new_coords):
+        return np.linalg.norm(new_coords - self.coords, axis=1)
 
-    def record(self, payload):
-        self.history.append(payload)
-        if len(self.history) > 10:
-            self.history.pop(0)
-
-    def delta_sigma(self):
-        if len(self.history) < 2:
-            return None
-        return self.history[-1]["sigma"] - self.history[-2]["sigma"]
-
-MEMORY = CausalMemory()
-
-class EVeto:
-    """Filtro de Honestidad Entrópica"""
-    @staticmethod
-    def evaluate(LI, R, delta_H):
-        eta = (LI + R) / 2
-        passed = (eta >= 0.99) and (delta_H <= -0.2)
-        return passed, eta
+# ==============================================================================
+# 5. MOTOR ONTOLÓGICO MULTISUSTRATO
+# ==============================================================================
 
 class OntologicalEngine:
 
     SUBSTRATES = {
-        "TIERRA": {"phi": 1.0},
-        "LUNA": {"phi": 5.0},
-        "MARTE": {"phi": 2.6},
-        "SOL": {"phi": 60.0},
-        "HEXATRÓN": {"phi": 1.0}
+        "TIERRA":        {"sigma": 1.0},
+        "LUNA":          {"sigma": 0.05},
+        "MARTE":         {"sigma": 0.38},
+        "SOL":           {"sigma": 55.0},
+        "HIPERPRESION":  {"sigma": 120.0},
+        "VACIO_INDUCIDO":{"sigma": 0.01},
+        "HEXATRON":      {"sigma": 1.0}
     }
 
-    def parse_structure(self, pdb_content):
+    def parse_structure(self, pdb_text):
         parser = PDBParser(QUIET=True)
-        structure = parser.get_structure("TCDS", io.StringIO(pdb_content))
-        atoms = [a.get_coord() for a in structure.get_atoms()]
-        if len(atoms) < 10:
-            raise ValueError("Estructura inválida")
-        return np.array(atoms)
+        return parser.get_structure("TCDS", io.StringIO(pdb_text))
 
-    def compute_Q(self, coords):
+    def q_factor(self, structure):
+        coords = np.array([a.get_coord() for a in structure.get_atoms()])
         center = np.mean(coords, axis=0)
         rg = np.sqrt(np.mean(np.sum((coords-center)**2, axis=1)))
         return (100/(rg+1e-6))*6.5
 
-    def compute_sigma(self, coords):
-        cov = np.cov(coords.T)
-        eigvals = np.linalg.eigvals(cov)
-        return float(np.clip(np.min(eigvals)/np.max(eigvals), 0, 1))
-
-    def compute_entropy_drop(self, coords):
-        var = np.var(coords)
-        return -np.log(var+1e-9)
-
-    def evaluate_substrates(self, Q, sigma):
-        results = {}
-        for name, s in self.SUBSTRATES.items():
-            phi = s["phi"]
-            results[name] = "✅ SOSTENIDO" if Q*sigma >= phi else "❌ COLAPSO"
-        return results
-
-    def generate_html(self, pdb_content, style):
-        pdb_clean = pdb_content.replace('`','').replace('\\','\\\\')
-        return f"""
-        <html><head>
-        <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
-        </head><body style="margin:0;background:black;">
-        <div id="v" style="width:100vw;height:100vh;"></div>
-        <script>
-        let pdb=`{pdb_clean}`;
-       viewer.setStyle({}, {
-  cartoon: {
-    colorscheme: {
-      prop: 'b',
-      gradient: 'roygb',
-      min: 0,
-      max: maxStress
-    }
-  }
-});
-        let v=$3Dmol.createViewer("v");
-        v.addModel(pdb,"pdb");
-        v.setStyle({{}},{{{style}:{{color:"spectrum"}}}});
-        v.zoomTo();v.render();v.animate();
-        </script></body></html>
-        """
-
-ENGINE = OntologicalEngine()
-
 # ==============================================================================
-# 🖥️ UI
+# 6. VISOR 3D TERMOFÍSICO
 # ==============================================================================
 
-st.markdown("## ⚛️ OMNIKERNEL CENTURION v101.0")
+def render_view(pdb, stress=None, style="cartoon"):
+    pdb_clean = pdb.replace("`","")
+    stress_js = json.dumps(stress.tolist()) if stress is not None else "null"
 
-uploaded = st.file_uploader("INGESTA PDB", type=["pdb"])
-manual = st.text_area("PDB manual", height=120)
+    html = f"""
+    <html>
+    <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+    <div id="v" style="width:100%;height:500px;"></div>
+    <script>
+    let pdb = `{pdb_clean}`;
+    let stress = {stress_js};
+    let v = $3Dmol.createViewer("v",{{backgroundColor:"black"}});
+    v.addModel(pdb,"pdb");
 
-pdb = None
+    if(stress){{
+        v.setStyle({{}},{{cartoon:{{colorscheme:{{prop:'b',gradient:'roygb',min:0,max:Math.max(...stress)}}}}}});
+    }} else {{
+        v.setStyle({{}},{{{style}:{{color:'spectrum'}}}});
+    }}
+
+    v.zoomTo(); v.render();
+    </script>
+    </html>
+    """
+    components.html(html, height=520)
+
+# ==============================================================================
+# 7. INTERFAZ STREAMLIT
+# ==============================================================================
+
+st.markdown("## ⚛️ OMNIKERNEL CENTURION v101.5")
+st.caption("Motor Ontológico · Termodinámica Paramétrica · Exportación Multisustrato")
+
+uploaded = st.file_uploader("Cargar PDB", type=["pdb"])
+pdb_text = None
+
 if uploaded:
-    pdb = uploaded.getvalue().decode()
-elif "ATOM" in manual:
-    pdb = manual
+    pdb_text = uploaded.getvalue().decode()
 
-if pdb:
-    st.success("Estructura cargada")
+if pdb_text:
+    engine = OntologicalEngine()
+    structure = engine.parse_structure(pdb_text)
+    q = engine.q_factor(structure)
 
-    if st.button("EJECUTAR NÚCLEO CANÓNICO"):
-        with st.spinner("Evaluando balance coherencial..."):
-            coords = ENGINE.parse_structure(pdb)
-            Q = ENGINE.compute_Q(coords)
-            sigma = ENGINE.compute_sigma(coords)
-            delta_H = ENGINE.compute_entropy_drop(coords)
+    st.metric("Q-Factor", f"{q:.2f} uTCDS")
 
-            # Métricas reproducibilidad simulada
-            LI = sigma
-            R = 1 - abs(np.std(coords)/100)
+    # ---- CONTROLES TERMODINÁMICOS ----
+    sigma = st.slider("Presión σ", 0.0, 150.0, 1.0)
+    q_ext = st.slider("Q externo", -50.0, 200.0, 10.0)
 
-            passed, eta = EVeto.evaluate(LI, R, delta_H)
+    thermo = TCDS_ThermoEngine(structure)
+    new_coords = thermo.apply_pressure(sigma, q_ext)
+    stress = thermo.stress_field(new_coords)
 
-            MEMORY.record({
-                "timestamp": datetime.utcnow().isoformat(),
-                "Q": Q,
-                "sigma": sigma
-            })
+    # ---- VISUALIZACIÓN ----
+    render_view(pdb_text, stress=stress)
 
-            st.metric("Q (uTCDS)", f"{Q:.2f}")
-            st.metric("Σ", f"{sigma:.3f}")
-            st.metric("ΔH", f"{delta_H:.3f}")
-            st.metric("η (E-Veto)", f"{eta:.3f}")
-
-            if passed:
-                st.success("E-VETO: VALIDADO")
-            else:
-                st.error("E-VETO: RECHAZADO")
-
-            st.markdown("### Diagnóstico por Sustrato")
-            diag = ENGINE.evaluate_substrates(Q, sigma)
-            for k,v in diag.items():
-                st.write(k, v)
-
-    style = st.selectbox("Modo visual", ["cartoon","stick","sphere","line"])
-    components.html(ENGINE.generate_html(pdb, style), height=480)
+    # ---- EXPORTACIÓN MULTISUSTRATO ----
+    if st.button("📦 Exportar PDB Multisustrato"):
+        zip_name = "TCDS_Multisubstrate.zip"
+        with zipfile.ZipFile(zip_name, "w") as z:
+            for name, s in engine.SUBSTRATES.items():
+                coords = thermo.apply_pressure(s["sigma"], q_ext)
+                out = ""
+                i=0
+                for atom in structure.get_atoms():
+                    x,y,zv = coords[i]
+                    out += f"{atom.get_parent().get_id():<6}{x:8.3f}{y:8.3f}{zv:8.3f}\n"
+                    i+=1
+                z.writestr(f"{name}.pdb", out)
+        with open(zip_name,"rb") as f:
+            st.download_button("⬇️ Descargar ZIP", f, file_name=zip_name)
 
 else:
-    st.info("Esperando estructura")
+    st.info("Esperando estructura PDB…")
 
-st.caption("© 2026 TCDS | OmniKernel Canon v101")
+st.caption("© 2026 · TCDS · OmniKernel Centurion")
