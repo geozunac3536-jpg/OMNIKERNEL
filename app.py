@@ -17,7 +17,28 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+# =========================
+# BLOQUE 1: ESTADO TERMO
+# =========================
 
+class ThermoState:
+    def __init__(self, pressure=1.0, tension=0.0, temperature=300.0):
+        self.pressure = pressure        # escala adimensional
+        self.tension = tension          # deformación estructural
+        self.temperature = temperature  # K (efectiva)
+
+    def apply(self, coord):
+        """
+        Aplica presión + tensión a un vector (x,y,z)
+        """
+        x, y, z = coord
+        scale = 1.0 - self.pressure * 0.01
+        deform = 1.0 + self.tension * 0.01
+        return (
+            x * scale * deform,
+            y * scale,
+            z * scale
+        )
 # ------------------------------------------------------------------------------
 # 2. IMPORTACIONES
 # ------------------------------------------------------------------------------
@@ -31,7 +52,21 @@ try:
 except ImportError as e:
     st.error(f"Dependencia faltante: {e}")
     st.stop()
+# =========================
+# BLOQUE 2: DEFORMACIÓN
+# =========================
 
+def apply_thermo_to_structure(structure, thermo_state):
+    """
+    Devuelve coordenadas deformadas sin alterar el objeto original
+    """
+    new_coords = []
+
+    for atom in structure.get_atoms():
+        x, y, z = atom.get_coord()
+        new_coords.append(thermo_state.apply((x, y, z)))
+
+    return new_coords
 # ------------------------------------------------------------------------------
 # 3. ESTILOS DEEPTECH
 # ------------------------------------------------------------------------------
@@ -42,7 +77,22 @@ h1,h2,h3 { border-bottom:1px solid #004444; }
 button { background:#002222 !important; color:#00ffcc !important; }
 </style>
 """, unsafe_allow_html=True)
+# =========================
+# BLOQUE 3: MÉTRICAS
+# =========================
 
+def compute_energy_metrics(coords, thermo_state):
+    """
+    Métricas simples pero deterministas
+    """
+    energies = []
+
+    for x, y, z in coords:
+        r = (x**2 + y**2 + z**2) ** 0.5
+        energy = thermo_state.pressure * r + thermo_state.tension * abs(z)
+        energies.append(energy)
+
+    return energies
 # ==============================================================================
 # 4. NÚCLEO FÍSICO TCDS
 # ==============================================================================
@@ -75,7 +125,19 @@ class TCDS_ThermoEngine:
 
     def stress_field(self, new_coords):
         return np.linalg.norm(new_coords - self.coords, axis=1)
+# =========================
+# BLOQUE 4: VISUALIZACIÓN
+# =========================
 
+import py3Dmol
+import streamlit as st
+
+def show_structure(pdb_string):
+    view = py3Dmol.view(width=800, height=600)
+    view.addModel(pdb_string, "pdb")
+    view.setStyle({"cartoon": {"color": "spectrum"}})
+    view.zoomTo()
+    st.components.v1.html(view._make_html(), height=600)
 # ==============================================================================
 # 5. MOTOR ONTOLÓGICO MULTISUSTRATO
 # ==============================================================================
@@ -101,7 +163,39 @@ class OntologicalEngine:
         center = np.mean(coords, axis=0)
         rg = np.sqrt(np.mean(np.sum((coords-center)**2, axis=1)))
         return (100/(rg+1e-6))*6.5
+# =========================
+# BLOQUE 5: EXPORT PDB
+# =========================
 
+def export_pdb(structure, coords, filepath):
+    out = ""
+    atom_serial = 1
+
+    for atom, (x, y, z) in zip(structure.get_atoms(), coords):
+        res = atom.get_parent()
+        chain = res.get_parent()
+
+        atom_name = atom.get_name()
+        resname = res.get_resname()
+        chain_id = chain.id if chain.id.strip() else "A"
+        resseq = res.id[1]
+        element = atom.element.strip() if atom.element else atom_name[0]
+
+        out += (
+            f"ATOM  {atom_serial:5d} "
+            f"{atom_name:<4}"
+            f"{resname:>3} "
+            f"{chain_id}"
+            f"{resseq:4d}    "
+            f"{x:8.3f}{y:8.3f}{z:8.3f}"
+            f"  1.00 20.00           {element:>2}\n"
+        )
+        atom_serial += 1
+
+    out += "END\n"
+
+    with open(filepath, "w") as f:
+        f.write(out)
 # ==============================================================================
 # 6. VISOR 3D TERMOFÍSICO
 # ==============================================================================
@@ -131,7 +225,19 @@ def render_view(pdb, stress=None, style="cartoon"):
     </html>
     """
     components.html(html, height=520)
+# =========================
+# BLOQUE 6: STREAMLIT
+# =========================
 
+pressure = st.slider("Presión", 0.0, 10.0, 1.0)
+tension = st.slider("Tensión", -5.0, 5.0, 0.0)
+temperature = st.slider("Temperatura (K)", 100, 600, 300)
+
+thermo = ThermoState(pressure, tension, temperature)
+coords = apply_thermo_to_structure(structure, thermo)
+
+if st.button("Exportar PDB"):
+    export_pdb(structure, coords, "output_multisustrato.pdb")
 # ==============================================================================
 # 7. INTERFAZ STREAMLIT
 # ==============================================================================
